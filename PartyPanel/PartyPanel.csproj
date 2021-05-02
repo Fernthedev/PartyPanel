@@ -147,5 +147,8 @@
     <Analyzer Include="..\..\..\SteamLibrary\steamapps\common\Beat Saber\Beat Saber_Data\Managed\UnityEngine.UIModule.dll" />
     <Analyzer Include="..\..\..\SteamLibrary\steamapps\common\Beat Saber\Beat Saber_Data\Managed\UnityEngine.VRModule.dll" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="index.html" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

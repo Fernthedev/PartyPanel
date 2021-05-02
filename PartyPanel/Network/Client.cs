@@ -1,9 +1,15 @@
-﻿using PartyPanelShared;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Net;
+using System.Linq;
+using System.Text;
 using System.Net.Sockets;
+using System.Net;
+using System.IO;
 using System.Threading;
+using System.Diagnostics;
+using System.Reflection;
+using System.Threading.Tasks;
+using PartyPanelShared;
 
 namespace PartyPanel.Network
 {
@@ -26,6 +32,11 @@ namespace PartyPanel.Network
 
         private static ManualResetEvent connectDone = new ManualResetEvent(false);
 
+        private HttpListener _listener;
+        private CancellationTokenSource _cancellationToken;
+        private string _pageData;
+        private readonly SemaphoreSlim _requestLock = new SemaphoreSlim(1, 1);
+
         public bool Connected
         {
             get
@@ -41,117 +52,80 @@ namespace PartyPanel.Network
 
         public void Start()
         {
-            IPAddress ipAddress = IPAddress.Loopback;
-            IPEndPoint remoteEP = new IPEndPoint(ipAddress, port);
-
-            Socket client = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-
-            client.BeginConnect(remoteEP, new AsyncCallback(ConnectCallback), client);
-            connectDone.WaitOne();
-        }
-
-        private void ConnectCallback(IAsyncResult ar)
-        {
-            try
+            if (_pageData == null)
             {
-                // Retrieve the socket from the state object.  
-                Socket client = (Socket)ar.AsyncState;
-
-                // Complete the connection.  
-                client.EndConnect(ar);
-
-                // Create the player object.
-                player = new ClientPlayer();
-                player.workSocket = client;
-
-                //Signal to continue after connect
-                connectDone.Set();
-
-                // Begin receiving the data from the remote device.  
-                client.BeginReceive(player.buffer, 0, ClientPlayer.BufferSize, 0, new AsyncCallback(ReadCallback), player);
+                var reader = new StreamReader(Assembly.GetExecutingAssembly().GetManifestResourceStream("PartyPanel.index.html"));
+                _pageData = reader.ReadToEnd();
             }
-            catch (Exception e)
+
+            if (_listener != null)
             {
-                Logger.Debug(e.ToString());
+                return;
             }
-        }
 
-        private void ReadCallback(IAsyncResult ar)
-        {
-            try
+            _cancellationToken = new CancellationTokenSource();
+            _listener = new HttpListener { Prefixes = { $"http://localhost:50101/" } };
+            _listener.Start();
+
+
+            Task.Run(async () =>
             {
-                ClientPlayer player = (ClientPlayer)ar.AsyncState;
-                Socket client = player.workSocket;
-
-                // Read data from the remote device.  
-                int bytesRead = client.EndReceive(ar);
-
-                if (bytesRead > 0)
+                while (true)
                 {
-                    var currentBytes = new byte[bytesRead];
-                    Buffer.BlockCopy(player.buffer, 0, currentBytes, 0, bytesRead);
-
-                    player.accumulatedBytes.AddRange(currentBytes);
-                    if (player.accumulatedBytes.Count >= Packet.packetHeaderSize)
+                    try
                     {
-                        //If we're not at the start of a packet, increment our position until we are, or we run out of bytes
-                        var accumulatedBytes = player.accumulatedBytes.ToArray();
-                        while (!Packet.StreamIsAtPacket(accumulatedBytes) && accumulatedBytes.Length >= Packet.packetHeaderSize)
-                        {
-                            player.accumulatedBytes.RemoveAt(0);
-                            accumulatedBytes = player.accumulatedBytes.ToArray();
-                        }
-
-                        if (Packet.PotentiallyValidPacket(accumulatedBytes))
-                        {
-                            PacketRecieved?.Invoke(Packet.FromBytes(accumulatedBytes));
-                            player.accumulatedBytes.Clear();
-                        }
+                        var httpListenerContext = await _listener.GetContextAsync().ConfigureAwait(false);
+                        await OnContext(httpListenerContext).ConfigureAwait(false);
                     }
-
-                    // Get the rest of the data.  
-                    client.BeginReceive(player.buffer, 0, ClientPlayer.BufferSize, 0, new AsyncCallback(ReadCallback), player);
+                    catch (Exception e)
+                    {
+                    }
                 }
-            }
-            catch (Exception e)
-            {
-                Logger.Debug(e.ToString());
-                ServerDisconnected_Internal();
-            }
-        }
 
-        public void Send(byte[] data)
-        {
-            player.workSocket.BeginSend(data, 0, data.Length, 0, new AsyncCallback(SendCallback), player.workSocket);
+                // ReSharper disable once FunctionNeverReturns
+            }).ConfigureAwait(false);
         }
-
-        private void SendCallback(IAsyncResult ar)
+        public async void Send(byte[] data)
         {
+
+        }
+        private async Task OnContext(HttpListenerContext ctx)
+        {
+            await _requestLock.WaitAsync();
             try
             {
-                // Retrieve the socket from the state object.  
-                Socket client = (Socket)ar.AsyncState;
+                var request = ctx.Request;
+                var response = ctx.Response;
 
-                // Complete sending the data to the remote device.  
-                int bytesSent = client.EndSend(ar);
+                if (request.HttpMethod == "POST" && request.Url.AbsolutePath == "/song")
+                {
+                    var reader = new StreamReader(request.InputStream, request.ContentEncoding);
+                    var postStr = await reader.ReadToEndAsync().ConfigureAwait(false);
+                    Console.WriteLine(postStr);
+                }
+                else
+                {
+                    /*var settingsJson = _settings.GetSettingsAsJson();
+					settingsJson["twitch_oauth_token"] = new JSONString(_authManager.Credentials.Twitch_OAuthToken);
+					settingsJson["twitch_channels"] = new JSONArray(_authManager.Credentials.Twitch_Channels);*/
+
+                    var pageBuilder = new StringBuilder(_pageData);
+
+                    var data = Encoding.UTF8.GetBytes(pageBuilder.ToString());
+                    response.ContentType = "text/html";
+                    response.ContentEncoding = Encoding.UTF8;
+                    response.ContentLength64 = data.LongLength;
+                    await response.OutputStream.WriteAsync(data, 0, data.Length);
+                }
+
+                response.Close();
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                Logger.Debug(e.ToString());
-                ServerDisconnected_Internal();
             }
-        }
-
-        private void ServerDisconnected_Internal()
-        {
-            Shutdown();
-            ServerDisconnected?.Invoke();
-        }
-
-        public void Shutdown()
-        {
-            if (player.workSocket.Connected) player.workSocket.Shutdown(SocketShutdown.Both);
-            player.workSocket.Close();
+            finally
+            {
+            }
         }
     }
 }
