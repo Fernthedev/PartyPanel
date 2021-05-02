@@ -105,10 +105,6 @@ namespace PartyPanel.Network
                 }
                 else
                 {
-                    /*var settingsJson = _settings.GetSettingsAsJson();
-					settingsJson["twitch_oauth_token"] = new JSONString(_authManager.Credentials.Twitch_OAuthToken);
-					settingsJson["twitch_channels"] = new JSONArray(_authManager.Credentials.Twitch_Channels);*/
-
                     var pageBuilder = new StringBuilder(_pageData);
 
                     var data = Encoding.UTF8.GetBytes(pageBuilder.ToString());
