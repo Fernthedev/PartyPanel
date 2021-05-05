@@ -1,18 +1,64 @@
 <template>
-  <img alt="Vue logo" src="./assets/logo.png">
-  <HelloWorld msg="Welcome to Your Vue.js + TypeScript App"/>
+  <div>
+    <h1>SongList</h1>
+    <SongList :songList="songList"/>
+  </div>
 </template>
 
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
-import HelloWorld from './components/HelloWorld.vue';
+import SongList from './components/SongList.vue';
+import { Song } from './models/Song';
 
 @Options({
   components: {
-    HelloWorld,
+    SongList,
   },
 })
-export default class App extends Vue {}
+export default class App extends Vue {
+  fetchSonglist(): Song[] {
+    // use axios here
+    // return await Vue.axios.get('/endpoint-path-example');
+    return [
+      {
+        id: 'd7hsb',
+        interpret: "Green Day",
+        title: "Holyday",
+        subtitle: "feat. Michael Jackson",
+        mapper: "FuturMapper",
+        difficulty: {
+          easy: true,
+          normal: true,
+          hard: true,
+          expert: true,
+          custom: [
+            'expert+'
+          ]
+        }
+      },
+      {
+        id: '9hszd',
+        interpret: "Rise Against",
+        title: "Help is on the way",
+        subtitle: "(explicit)",
+        mapper: "FuturMapper 2",
+        difficulty: {
+          easy: false,
+          normal: false,
+          hard: true,
+          expert: true,
+          custom: []
+        }
+      }
+    ]
+  }
+
+  private songList: Song[] = [];
+
+  async mounted() {
+    this.songList = await this.fetchSonglist()
+  }
+}
 </script>
 
 <style>
@@ -20,8 +66,6 @@ export default class App extends Vue {}
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-align: center;
   color: #2c3e50;
-  margin-top: 60px;
 }
 </style>
