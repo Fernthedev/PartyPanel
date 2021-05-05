@@ -17,8 +17,6 @@ import { Song } from './models/Song';
 })
 export default class App extends Vue {
   fetchSonglist(): Song[] {
-    // use axios here
-    // return await Vue.axios.get('/endpoint-path-example');
     return [
       {
         id: 'd7hsb',
@@ -26,15 +24,13 @@ export default class App extends Vue {
         title: "Holyday",
         subtitle: "feat. Michael Jackson",
         mapper: "FuturMapper",
-        difficulty: {
-          easy: true,
-          normal: true,
-          hard: true,
-          expert: true,
-          custom: [
-            'expert+'
-          ]
-        }
+        difficulties: [
+          "Easy",
+          "Normal",
+          "Hard",
+          "Expert",
+          "ExpertPlus"
+        ]
       },
       {
         id: '9hszd',
@@ -42,17 +38,15 @@ export default class App extends Vue {
         title: "Help is on the way",
         subtitle: "(explicit)",
         mapper: "FuturMapper 2",
-        difficulty: {
-          easy: false,
-          normal: false,
-          hard: true,
-          expert: true,
-          custom: []
-        }
+        difficulties: [
+          "Easy",
+          "Normal",
+          "Hard",
+          "Expert"
+        ]
       }
     ]
   }
-
   private songList: Song[] = [];
 
   async mounted() {

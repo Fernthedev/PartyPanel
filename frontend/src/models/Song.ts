@@ -4,11 +4,5 @@ export type Song =  {
   title: string,
   subtitle?: string,
   mapper?: string,
-  difficulty: {
-    easy: boolean,
-    normal: boolean,
-    hard: boolean,
-    expert: boolean,
-    custom?: string[],
-  },
+  difficulties: [string?, string?, string?, string?, string?]
 };
