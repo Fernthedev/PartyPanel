@@ -3,8 +3,8 @@ using SongCore;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
-using UnityEngine.SceneManagement;
+using System.Threading;
+using UnityEngine;  
 using Logger = PartyPanelShared.Logger;
 
 /*
@@ -35,6 +35,7 @@ namespace PartyPanel
 
             Loader.SongsLoadedEvent += (Loader _, ConcurrentDictionary<string, CustomPreviewBeatmapLevel> __) =>
             {
+
                 if (_alwaysOwnedContent == null) _alwaysOwnedContent = Resources.FindObjectsOfTypeAll<AlwaysOwnedContentSO>().First();
 
                 masterLevelList = new List<IPreviewBeatmapLevel>();
@@ -44,32 +45,8 @@ namespace PartyPanel
                 }
                 masterLevelList.AddRange(Loader.CustomLevelsCollection.beatmapLevels);
 
-                client.SendSongList(masterLevelList);
+                //client.SendSongList(masterLevelList);
             };
-        }
-
-        public void OnApplicationQuit()
-        {
-        }
-
-        public void OnSceneLoaded(Scene scene, LoadSceneMode sceneMode)
-        {
-        }
-
-        public void OnSceneUnloaded(Scene scene)
-        {
-        }
-
-        public void OnActiveSceneChanged(Scene prevScene, Scene nextScene)
-        {
-        }
-
-        public void OnUpdate()
-        {
-        }
-
-        public void OnFixedUpdate()
-        {
         }
     }
 }
