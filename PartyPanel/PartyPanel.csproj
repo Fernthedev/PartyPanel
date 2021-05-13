@@ -52,6 +52,10 @@
     <Reference Include="Main">
       <HintPath>..\..\..\SteamLibrary\steamapps\common\Beat Saber\Beat Saber_Data\Managed\Main.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\SteamLibrary\steamapps\common\Beat Saber\Libs\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="Polyglot">
       <HintPath>D:\SteamLibrary\steamapps\common\Beat Saber\Beat Saber_Data\Managed\Polyglot.dll</HintPath>
       <Private>False</Private>
@@ -151,6 +155,9 @@
     <Compile Include="..\Shared\Models\Packets\SongList.cs">
       <Link>Shared\Models\Packets\SongList.cs</Link>
     </Compile>
+	  <Compile Include="..\Shared\Models\Packets\ServerMetadata.cs">
+		  <Link>Shared\Models\Packets\ServerMetadata.cs</Link>
+	  </Compile>
     <Compile Include="..\Shared\Models\PlayerSpecificSettnigs.cs">
       <Link>Shared\Models\PlayerSpecificSettnigs.cs</Link>
     </Compile>

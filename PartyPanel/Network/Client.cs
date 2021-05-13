@@ -128,6 +128,7 @@ namespace PartyPanel.Network
 
         public void Send(byte[] data)
         {
+            Logger.Debug("Sending " + data.Length.ToString() + " Bytes");
             player.workSocket.BeginSend(data, 0, data.Length, 0, new AsyncCallback(SendCallback), player.workSocket);
         }
 

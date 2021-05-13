@@ -1,9 +1,11 @@
 ﻿using IPA.Utilities.Async;
+using Newtonsoft.Json;
 using PartyPanelShared;
 using PartyPanelShared.Models;
 using Polyglot;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -65,10 +67,11 @@ namespace PartyPanel
                 client.PacketRecieved += Client_PacketRecieved;
                 client.ServerDisconnected += Client_ServerDisconnected;
                 client.Start();
-
+                Logger.Debug("Start");
                 //Send the server the master list if we can
                 if (Plugin.masterLevelList != null)
                 {
+                    Logger.Debug("X");
                     HMMainThreadDispatcher.instance.Enqueue(new Action(() => { SendSongList(Plugin.masterLevelList).ConfigureAwait(false); }));
                 }
             
@@ -83,22 +86,24 @@ namespace PartyPanel
         {
             Logger.Debug("Server disconnected!");
         }
-
+        List<PreviewBeatmapLevel> subpacketList = new List<PreviewBeatmapLevel>();
         public async Task SendSongList(List<IPreviewBeatmapLevel> levels)
         {
+            Logger.Debug("F");
+            PlayerData playerData = Resources.FindObjectsOfTypeAll<PlayerDataModel>().FirstOrDefault().playerData;
             //Check if we are connected
             if (client != null && client.Connected)
             {
-                //Make Packet List
-                var subpacketList = new List<PreviewBeatmapLevel>();
+                Logger.Debug("M");
+                //subpacketList.Clear();
 
                 //Iterate Over Levels
                 for (int i = 0; i < levels.Count; i++)
                 {
                     //Convert to Packet type and add to list
-                    subpacketList.Add(await ConvertToPacketType(levels[i]));
+                    subpacketList.Add(await ConvertToPacketType(levels[i], playerData));
                 }
-
+                Logger.Debug("D");
                 //Make SongList
                 var songList = new SongList();
 
@@ -106,15 +111,76 @@ namespace PartyPanel
                 songList.Levels = subpacketList.ToArray();
 
                 //Send the list over the Network
+                Logger.Debug("Sending List");
+                File.WriteAllText(Path.Combine(IPA.Utilities.UnityGame.UserDataPath, "JSon.txt"), JsonConvert.SerializeObject(songList));
                 client.Send(new Packet(songList).ToBytes());
             }
-            else Logger.Debug("Skipped sending songs because there is no server connected");
+            else
+            {
+                SendSongList(levels).ConfigureAwait(false);
+            }
         }
-
-        public async Task<PreviewBeatmapLevel> ConvertToPacketType(IPreviewBeatmapLevel x)
-        { 
-            //Test Thread
+        public Texture2D GetReadableTexForUnreadableTex(Texture2D tex)
+        {
             Logger.Debug("Is Main Thread: " + threadTester.TestThread(Thread.CurrentThread).ToString());
+            tex.filterMode = FilterMode.Point;
+
+            //Get Temporary RenderTexture
+            RenderTexture rt = RenderTexture.GetTemporary(tex.width, tex.height);
+            rt.filterMode = FilterMode.Point;
+
+            //Set RenderTexture as Active
+            RenderTexture.active = rt;
+
+            //Blit Texture to RenderTexture
+            Graphics.Blit(tex, rt);
+
+            //Make New Texture
+            Texture2D img2 = new Texture2D(tex.width, tex.height);
+
+            //Read Pixels from RenderTexture
+            img2.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
+
+            //Apply Pixels
+            img2.Apply();
+            
+            //Reset Active RenderTexure
+            RenderTexture.ReleaseTemporary(rt);
+            RenderTexture.active = null;
+
+            return img2;
+        }
+        public Texture2D ClipTexture(Texture2D tex, Rect rect)
+        {
+            var pixData = tex.GetPixels((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height);
+            var newTex = new Texture2D((int)rect.width, (int)rect.height);
+            newTex.SetPixels(pixData);
+            newTex.Apply();
+            return newTex;
+        }
+        public PreviewBeatmapLevel LoadSong(PreviewBeatmapLevel packetLevel, IPreviewBeatmapLevel x)
+        {
+            PreviewBeatmapLevel level = packetLevel;
+            LoadedSong loadedSong = new LoadedSong();
+            HMMainThreadDispatcher.instance.Enqueue(() => 
+            { 
+                level.chars = x.previewDifficultyBeatmapSets.Select((PreviewDifficultyBeatmapSet set) => 
+                    { 
+                        Characteristic Char = new Characteristic(); 
+                        Logger.Debug(set.beatmapCharacteristic.icon.texture.isReadable.ToString()); 
+                        Char.Name = set.beatmapCharacteristic.serializedName; 
+                        Char.diffs = set.beatmapDifficulties.Select((BeatmapDifficulty diff) => { return BeatmapDifficultyMethods.Name(diff); }).ToArray(); 
+                        return Char; 
+                    }).ToArray(); 
+                loadedSong.level = level; 
+                client.Send(new Packet(loadedSong).ToBytes()); 
+            });
+            return level;
+        }
+        public async Task<PreviewBeatmapLevel> ConvertToPacketType(IPreviewBeatmapLevel x, PlayerData playerData)   
+        { 
+            //Test Threadx
+            
 
             //Make packet level
             var level = new PreviewBeatmapLevel();
@@ -124,48 +190,30 @@ namespace PartyPanel
             level.Name = x.songName;
             level.SubName = x.songSubName;
             level.Author = x.songAuthorName;
+            level.Mapper = x.levelAuthorName;
             level.BPM = x.beatsPerMinute;
-            level.Duration = x.previewDuration;
-            level.diffs = x.previewDifficultyBeatmapSets.Select((PreviewDifficultyBeatmapSet set) => { return set.beatmapCharacteristic.serializedName; }).ToArray();
+            level.Duration = TimeExtensions.MinSecDurationText(x.songDuration);
+            level.favorited = playerData.favoritesLevelIds.Contains(x.levelID);
+            //level.chars = x.previewDifficultyBeatmapSets.Select((PreviewDifficultyBeatmapSet set) => { Characteristic Char = new Characteristic(); Logger.Debug(set.beatmapCharacteristic.icon.texture.isReadable.ToString()); Char.Name = set.beatmapCharacteristic.serializedName; Char.Icon = GetReadableTexForUnreadableTex(set.beatmapCharacteristic.icon.texture).EncodeToPNG(); Char.diffs = set.beatmapDifficulties.Select((BeatmapDifficulty diff)=> { return BeatmapDifficultyMethods.ShortName(diff); }).ToArray(); return Char; }).ToArray();
             //Get Level Sprite
-            Sprite sprite = await x.GetCoverImageAsync(CancellationToken.None);
-
-            //Get Texture
-            Texture2D texture = sprite.texture;
-            if(!texture.isReadable)
+            if (!metadata.runLowCostMode)
             {
-                texture.filterMode = FilterMode.Point;
+                Sprite sprite = await x.GetCoverImageAsync(CancellationToken.None);
 
-                //Get Temporary RenderTexture
-                RenderTexture rt = RenderTexture.GetTemporary(texture.width, texture.height);
-                rt.filterMode = FilterMode.Point;
+                //Get Texture
+                Texture2D texture = sprite.texture;
+                if (!texture.isReadable)
+                {
+                    texture = GetReadableTexForUnreadableTex(texture);
+                }
 
-                //Set RenderTexture as Active
-                RenderTexture.active = rt;
-
-                //Blit Texture to RenderTexture
-                Graphics.Blit(texture, rt);
-
-                //Make New Texture
-                Texture2D img2 = new Texture2D(texture.width, texture.height);
-
-                //Read Pixels from RenderTexture
-                img2.ReadPixels(new Rect(0, 0, texture.width, texture.height), 0, 0);
-
-                //Apply Pixels
-                img2.Apply();
-                texture = img2;
-                //Reset Active RenderTexure
-                RenderTexture.ReleaseTemporary(rt);
-                RenderTexture.active = null;
+                //Encode to PNG and set packet cover
+                level.cover = texture.EncodeToPNG();
             }
-
-            //Encode to PNG and set packet cover
-            level.cover = texture.EncodeToPNG();
-
             Logger.Info("Got Cover for" + x.songName);
             return level;
         }
+        public static ServerMetadata metadata = new ServerMetadata();
         private void Client_PacketRecieved(Packet packet)
         {
             if (packet.Type == PacketType.PlaySong)
@@ -173,7 +221,7 @@ namespace PartyPanel
                 PlaySong playSong = packet.SpecificPacket as PlaySong;
 
                 var desiredLevel = Plugin.masterLevelList.First(x => x.levelID == playSong.levelId);
-                var desiredCharacteristic = desiredLevel.previewDifficultyBeatmapSets.GetBeatmapCharacteristics().First(x => x.serializedName == "Standard") ;
+                var desiredCharacteristic = desiredLevel.previewDifficultyBeatmapSets.GetBeatmapCharacteristics().First(x => x.serializedName == playSong.characteristic.Name);
                 BeatmapDifficulty desiredDifficulty;
                 playSong.difficulty.BeatmapDifficultyFromSerializedName(out desiredDifficulty);
 
@@ -184,21 +232,10 @@ namespace PartyPanel
             {
                 LoadSong loadSong = packet.SpecificPacket as LoadSong;
 
-                Action<IBeatmapLevel> SongLoaded = (loadedLevel) =>
-                {
-                    var loadedSong = new LoadedSong();
-                    var beatmapLevel = new PreviewBeatmapLevel();
-                    
-
-                    beatmapLevel.LevelId = loadedLevel.levelID;
-                    beatmapLevel.Name = loadedLevel.songName;
-
-                    loadedSong.level = beatmapLevel;
-
-                    client.Send(new Packet(loadedSong).ToBytes());
-                };
-
-                LoadSong(loadSong.levelId, SongLoaded);
+                LoadedSong loaded = new LoadedSong();
+                loaded.level = subpacketList.First(x => x.LevelId == loadSong.levelId);
+                loaded.level = LoadSong(loaded.level, Plugin.masterLevelList.First(x => x.levelID == loadSong.levelId));
+                //client.Send(new Packet(loaded).ToBytes());
             }
             else if (packet.Type == PacketType.Command)
             {
@@ -207,6 +244,10 @@ namespace PartyPanel
                 {
                     SaberUtilities.ReturnToMenu();
                 }
+            }
+            else if (packet.Type == PacketType.ServerMetadata)
+            {
+                metadata = packet.SpecificPacket as ServerMetadata;
             }
         }
 

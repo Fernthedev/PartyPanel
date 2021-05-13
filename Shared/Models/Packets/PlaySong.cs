@@ -7,6 +7,7 @@ namespace PartyPanelShared.Models
     {
         public string levelId;
         public string difficulty;
+        public Characteristic characteristic;
         //public PlayerSpecificSettings playerSettings;
         //public GameplayModifiers gameplayModifiers;
         //public PracticeSettings practiceSettings;

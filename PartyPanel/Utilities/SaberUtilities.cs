@@ -78,8 +78,7 @@ namespace PartyPanel
                 Button button = Resources.FindObjectsOfTypeAll<Button>().Where(x => x != null && x.name == "SoloButton").First();
                 button.onClick.Invoke();
             }
-            if ((level is PreviewBeatmapLevelSO && await HasDLCLevel(level.levelID)) ||
-                        level is CustomPreviewBeatmapLevel)
+            if ((level is PreviewBeatmapLevelSO /* && await HasDLCLevel(level.levelID)*/) || level is CustomPreviewBeatmapLevel)
             {
                 Logger.Debug("Loading DLC/Custom level...");
                 var result = await GetLevelFromPreview(level);
