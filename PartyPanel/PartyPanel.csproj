@@ -158,6 +158,9 @@
 	  <Compile Include="..\Shared\Models\Packets\ServerMetadata.cs">
 		  <Link>Shared\Models\Packets\ServerMetadata.cs</Link>
 	  </Compile>
+	  <Compile Include="..\Shared\Models\Packets\PreviewSong.cs">
+		  <Link>Shared\Models\Packets\PreviewSong.cs</Link>
+	  </Compile>
     <Compile Include="..\Shared\Models\PlayerSpecificSettnigs.cs">
       <Link>Shared\Models\PlayerSpecificSettnigs.cs</Link>
     </Compile>

@@ -44,8 +44,6 @@ namespace PartyPanel
                 var values = beatmapLevelsModel.GetField<Dictionary<string, IPreviewBeatmapLevel>, BeatmapLevelsModel>("_loadedPreviewBeatmapLevels").Values.ToArray();
                 
                 masterLevelList.AddRange(values);
-
-                //client.SendSongList(masterLevelList);
             };
         }
     }

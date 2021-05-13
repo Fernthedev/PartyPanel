@@ -14,6 +14,7 @@ namespace PartyPanelShared
         LoadedSong,
         PlaySong,
         ServerMetadata,
+        PreviewSong
     }
 
     public class Packet
