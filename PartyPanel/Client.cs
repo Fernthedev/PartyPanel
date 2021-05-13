@@ -72,7 +72,15 @@ namespace PartyPanel
                 if (Plugin.masterLevelList != null)
                 {
                     Logger.Debug("X");
-                    HMMainThreadDispatcher.instance.Enqueue(new Action(() => { SendSongList(Plugin.masterLevelList).ConfigureAwait(false); }));
+                    HMMainThreadDispatcher.instance.Enqueue(new Action(async () =>
+                    {
+                        var songs = await GetSongList(Plugin.masterLevelList);
+                        var unused = Task.Run(() =>
+                        {
+                            SendSongList(songs).ConfigureAwait(false);
+                        });
+
+                    }));
                 }
             
             }
@@ -86,24 +94,35 @@ namespace PartyPanel
         {
             Logger.Debug("Server disconnected!");
         }
-        List<PreviewBeatmapLevel> subpacketList = new List<PreviewBeatmapLevel>();
-        public async Task SendSongList(List<IPreviewBeatmapLevel> levels)
+
+        private List<PreviewBeatmapLevel> subpacketList = new List<PreviewBeatmapLevel>();
+
+
+        public async Task GetSongList(List<IPreviewBeatmapLevel> levels)
+        {
+            List<PreviewBeatmapLevel> subpacketList = new List<PreviewBeatmapLevel>();
+
+            PlayerData playerData = Resources.FindObjectsOfTypeAll<PlayerDataModel>().FirstOrDefault().playerData;
+            List<Task<PreviewBeatmapLevel>> tasks = new List<Task<PreviewBeatmapLevel>>();
+
+            foreach (var level in levels)
+            {
+                tasks.Add(ConvertToPacketType(level, playerData));
+            }
+
+            subpacketList.AddRange(await Task.WhenAll(tasks));
+
+            this.subpacketList = subpacketList;
+        }
+
+        public async Task SendSongList()
         {
             Logger.Debug("F");
-            PlayerData playerData = Resources.FindObjectsOfTypeAll<PlayerDataModel>().FirstOrDefault().playerData;
+
             //Check if we are connected
             if (client != null && client.Connected)
             {
                 Logger.Debug("M");
-                //subpacketList.Clear();
-
-                //Iterate Over Levels
-                for (int i = 0; i < levels.Count; i++)
-                {
-                    //Convert to Packet type and add to list
-                    subpacketList.Add(await ConvertToPacketType(levels[i], playerData));
-                }
-                Logger.Debug("D");
                 //Make SongList
                 var songList = new SongList();
 
@@ -117,7 +136,7 @@ namespace PartyPanel
             }
             else
             {
-                SendSongList(levels).ConfigureAwait(false);
+                var unused = SendSongList(subpacketList).ConfigureAwait(false);
             }
         }
         public Texture2D GetReadableTexForUnreadableTex(Texture2D tex)
@@ -171,8 +190,8 @@ namespace PartyPanel
                         Char.Name = set.beatmapCharacteristic.serializedName; 
                         Char.diffs = set.beatmapDifficulties.Select((BeatmapDifficulty diff) => { return BeatmapDifficultyMethods.Name(diff); }).ToArray(); 
                         return Char; 
-                    }).ToArray(); 
-                loadedSong.level = level; 
+                    }).ToArray();
+                loadedSong.level = level;
                 client.Send(new Packet(loadedSong).ToBytes()); 
             });
             return level;
