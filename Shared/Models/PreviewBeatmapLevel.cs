@@ -20,9 +20,10 @@ namespace PartyPanelShared.Models
         public string Mapper { get; set; }
         public string Duration { get; set; }
         public float BPM { get; set; }
+        public byte[] cover { get; set; } //Cover Imaage stored as bytes
+        public bool Favorited { get; set; }
+        public bool Owned { get; set; }
         // -- Only Loaded levels will have the following:
         public Characteristic[] chars { get; set; }
-        public byte[] cover { get; set; } //Cover Imaage stored as bytes
-        public bool favorited { get; set; }
     }
 }
