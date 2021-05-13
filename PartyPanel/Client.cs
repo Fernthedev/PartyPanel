@@ -297,7 +297,7 @@ namespace PartyPanel
                 LoadSong loadSong = packet.SpecificPacket as LoadSong;
 
                 LoadedSong loaded = new LoadedSong();
-                loaded.level = subPacketListCached.First(x => x.LevelId == loadSong.levelId);
+                loaded.level = subPacketListCached.First(x => x.Value.LevelId == loadSong.levelId).Value;
                 LoadSong(loaded.level, Plugin.masterLevelList.First(x => x.levelID == loadSong.levelId));
             }
             else if (packet.Type == PacketType.Command)
