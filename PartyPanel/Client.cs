@@ -73,7 +73,15 @@ namespace PartyPanel
                 if (Plugin.masterLevelList != null)
                 {
                     Logger.Debug("X");
-                    HMMainThreadDispatcher.instance.Enqueue(new Action(() => { SendSongList(Plugin.masterLevelList).ConfigureAwait(false); }));
+                    HMMainThreadDispatcher.instance.Enqueue(new Action(async () =>
+                    {
+                        await GetSongList(Plugin.masterLevelList);
+                        var unused = Task.Run(() =>
+                        {
+                            SendSongList().ConfigureAwait(false);
+                        });
+
+                    }));
                 }
             
             }
@@ -87,38 +95,60 @@ namespace PartyPanel
         {
             Logger.Debug("Server disconnected!");
         }
-        List<PreviewBeatmapLevel> subpacketList = new List<PreviewBeatmapLevel>();
-        public async Task SendSongList(List<IPreviewBeatmapLevel> levels)
+
+        private List<PreviewBeatmapLevel> subPacketListCached = new List<PreviewBeatmapLevel>();
+
+
+        public async Task GetSongList(List<IPreviewBeatmapLevel> levels)
         {
-            //Logger.Debug("F");
+            List<PreviewBeatmapLevel> subpacketList = new List<PreviewBeatmapLevel>();
             PlayerData playerData = Resources.FindObjectsOfTypeAll<PlayerDataModel>().FirstOrDefault().playerData;
+            List<Task<PreviewBeatmapLevel>> tasks = new List<Task<PreviewBeatmapLevel>>();
+
+            foreach (var level in levels)
+            {
+                tasks.Add(ConvertToPacketType(level, playerData));
+            }
+
+            subpacketList.AddRange(await Task.WhenAll(tasks));
+
+            subPacketListCached = subpacketList;
+        }
+
+        public async Task SendSongList()
+        {
+            Logger.Debug("F");
+
             //Check if we are connected
             if (client != null && client.Connected)
             {
-                //Logger.Debug("M");
-                //subpacketList.Clear();
-
-                //Iterate Over Levels
-                for (int i = 0; i < levels.Count; i++)
-                {
-                    //Convert to Packet type and add to list
-                    ConvertToPacketType(levels[i], playerData).ConfigureAwait(false);
-                }
-                //Logger.Debug("D");
-                //Make SongList
-                //var songList = new SongList();
-
-                //Set Levels
-                //songList.Levels = subpacketList.ToArray();
-
+                Logger.Debug("M");
                 //Send the list over the Network
-                //Logger.Debug("Sending List");
-                //File.WriteAllText(Path.Combine(IPA.Utilities.UnityGame.UserDataPath, "JSon.txt"), JsonConvert.SerializeObject(songList));
-                //client.Send(new Packet(songList).ToBytes());
+                Logger.Debug("Sending List");
+
+                var jsonWrite = Task.Run(() =>
+                {
+                    File.WriteAllText(Path.Combine(IPA.Utilities.UnityGame.UserDataPath, "JSon.txt"), JsonConvert.SerializeObject(songList));
+                });
+
+                var songSendingList = new List<Task>();
+
+                // Send each song individually
+                // Task.Run runs in a thread pool, so this is probably fine
+                subPacketListCached.ForEach(level =>
+                    {
+                        songSendingList.Add(Task.Run(() =>
+                        {
+                            var loadedSong = new LoadedSong {level = level};
+                            client.Send(new Packet(loadedSong).ToBytes());
+                        }));
+                    });
+                await jsonWrite;
+                Task.WaitAll(songSendingList.ToArray());
             }
             else
             {
-                SendSongList(levels).ConfigureAwait(false);
+                var unused = SendSongList().ConfigureAwait(false);
             }
         }
         public Texture2D GetReadableTexForUnreadableTex(Texture2D tex)
@@ -172,8 +202,8 @@ namespace PartyPanel
                         Char.Name = set.beatmapCharacteristic.serializedName; 
                         Char.diffs = set.beatmapDifficulties.Select((BeatmapDifficulty diff) => { return BeatmapDifficultyMethods.Name(diff); }).ToArray(); 
                         return Char; 
-                    }).ToArray(); 
-                loadedSong.level = level; 
+                    }).ToArray();
+                loadedSong.level = level;
                 client.Send(new Packet(loadedSong).ToBytes()); 
             });
         }
@@ -239,9 +269,8 @@ namespace PartyPanel
                 LoadSong loadSong = packet.SpecificPacket as LoadSong;
 
                 LoadedSong loaded = new LoadedSong();
-                loaded.level = subpacketList.First(x => x.LevelId == loadSong.levelId);
-                LoadSong(loaded.level, Plugin.masterLevelList.First(x => x.levelID == loadSong.levelId));
-                //client.Send(new Packet(loaded).ToBytes());
+                loaded.level = subPacketListCached.First(x => x.LevelId == loadSong.levelId);
+                loaded.level = LoadSong(loaded.level, Plugin.masterLevelList.First(x => x.levelID == loadSong.levelId));
             }
             else if (packet.Type == PacketType.Command)
             {
