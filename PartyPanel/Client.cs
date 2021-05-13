@@ -122,14 +122,6 @@ namespace PartyPanel
             //Check if we are connected
             if (client != null && client.Connected)
             {
-                Logger.Debug("M");
-                //Send the list over the Network
-                Logger.Debug("Sending List");
-
-                var jsonWrite = Task.Run(() =>
-                {
-                    File.WriteAllText(Path.Combine(IPA.Utilities.UnityGame.UserDataPath, "JSon.txt"), JsonConvert.SerializeObject(songList));
-                });
 
                 var songSendingList = new List<Task>();
 
@@ -143,7 +135,6 @@ namespace PartyPanel
                             client.Send(new Packet(loadedSong).ToBytes());
                         }));
                     });
-                await jsonWrite;
                 Task.WaitAll(songSendingList.ToArray());
             }
             else
@@ -240,7 +231,6 @@ namespace PartyPanel
 
                 PreviewSong songPacket = new PreviewSong();
                 songPacket.level = level;
-                subpacketList.Add(level);
                 client.Send(new Packet(songPacket).ToBytes());
             }
             catch(Exception e)
@@ -270,7 +260,7 @@ namespace PartyPanel
 
                 LoadedSong loaded = new LoadedSong();
                 loaded.level = subPacketListCached.First(x => x.LevelId == loadSong.levelId);
-                loaded.level = LoadSong(loaded.level, Plugin.masterLevelList.First(x => x.levelID == loadSong.levelId));
+                LoadSong(loaded.level, Plugin.masterLevelList.First(x => x.levelID == loadSong.levelId));
             }
             else if (packet.Type == PacketType.Command)
             {
